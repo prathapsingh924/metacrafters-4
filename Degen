@@ -1,0 +1,75 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.18;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+
+contract Token is ERC20, Ownable, ERC20Burnable {
+    event PlayerRewarded(address indexed player, uint256 rewardAmount);
+    event ItemRedeemed(address indexed player, string item, uint256 cost);
+    event PlayerBalanceChecked(address indexed player, uint256 balance);
+    event BonusTokensGranted(address indexed sender, address indexed grantee, uint256 mass);
+
+    enum GameReward {
+        GoldCoins,
+        MagicScroll,
+        EnchantedGem,
+        MaxGameReward
+    }
+
+    mapping(GameReward => uint256) private rewardCosts;
+    mapping(GameReward => string) private rewardNames;
+
+    constructor() ERC20("Degen", "DGN") Ownable(msg.sender) ERC20Burnable() {
+        uint256 initialSupply = 100;
+        address initialOwner = msg.sender;
+
+        _mint(initialOwner, initialSupply);
+
+        rewardCosts[GameReward.GoldCoins] = 20;
+        rewardCosts[GameReward.MagicScroll] = 30;
+        rewardCosts[GameReward.EnchantedGem] = 40;
+
+        rewardNames[GameReward.GoldCoins] = "Gold Coins";
+        rewardNames[GameReward.MagicScroll] = "Magic Scroll";
+        rewardNames[GameReward.EnchantedGem] = "Enchanted Gem";
+    }
+
+    function mintTokens(address grantee, uint256 mass) external onlyOwner {
+        _mint(grantee, mass);
+    }
+
+    function transferTokens(address grantee, uint256 mass) external {
+        _transfer(msg.sender, grantee, mass);
+    }
+
+    function burn(uint256 mass) public override  {
+        _burn(msg.sender, mass);
+    }
+
+    function redeemGameReward(GameReward gameReward) external {
+        require(gameReward < GameReward.MaxGameReward, "Invalid game reward");
+
+        uint256 tokensToBurn = rewardCosts[gameReward];
+        require(tokensToBurn > 0, "Invalid game reward");
+
+        require(balanceOf(msg.sender) >= tokensToBurn, "Not enough funds");
+
+        _burn(msg.sender, tokensToBurn);
+        emit ItemRedeemed(msg.sender, rewardNames[gameReward], tokensToBurn);
+    }
+
+    function getPlayerBalance(address player) external view returns (uint256) {
+        return balanceOf(player);
+    }
+
+    function grantBonusTokens(address grantee, uint256 mass) external onlyOwner {
+        require(grantee != address(0), "Invalid grantee address");
+        require(mass > 0, "Invalid mass amount");
+        require(balanceOf(owner()) >= mass, "Not enough funds for the mass");
+
+        _transfer(owner(), grantee, mass);
+        emit BonusTokensGranted(owner(), grantee, mass);
+    }
+}
